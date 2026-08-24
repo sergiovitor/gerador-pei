@@ -1,0 +1,30 @@
+name: Gerar Instalador Windows
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest # O robô usará um Windows verdadeiro aqui
+    
+    steps:
+      - name: Baixar os ficheiros do projeto
+        uses: actions/checkout@v3
+
+      - name: Instalar o Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Instalar as dependências
+        run: npm install
+
+      - name: Gerar o instalador .exe
+        run: npm run build-win
+
+      - name: Salvar o instalador para download
+        uses: actions/upload-artifact@v3
+        with:
+          name: Instalador-Gerador-PEI
+          path: dist/*.exe

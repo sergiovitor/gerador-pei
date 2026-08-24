@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de PEI - Lote Único Oficial</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
+    <style>
+        :root { --azul-cp2: #003366; --cinza-fundo: #f8f9fa; --cinza-borda: #cbd5e1; --texto-escuro: #1e293b; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: var(--texto-escuro); line-height: 1.4; margin: 0; padding: 20px; background-color: #e9ecef; }
+        .painel-controlo { background: white; max-width: 900px; margin: 0 auto 20px auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid var(--azul-cp2); }
+        .painel-controlo input[type="file"] { display: block; margin: 20px auto; padding: 15px; border: 2px dashed var(--azul-cp2); background: #f4f6f9; cursor: pointer; width: 80%; border-radius: 6px; }
+        .btn-acao { width: 250px; margin: 10px; background: var(--azul-cp2); color: white; padding: 12px; font-weight: 600; font-size: 15px; border-radius: 5px; cursor: pointer; border: none; transition: 0.3s; }
+        .btn-acao:hover { background: #002244; }
+        .btn-imprimir { background: #28a745; display: none; }
+        .btn-imprimir:hover { background: #218838; }
+        .btn-lote-electron { width: 100%; margin-top: 15px; background: #155e75; display: none; } /* Escondido no browser, visível no Electron */
+        .btn-lote-electron:hover { background: #0e4a60; }
+        #status-lote { font-weight: 600; color: var(--azul-cp2); margin-top: 10px; font-size: 15px; }
+        #erro-log { color: #dc3545; font-size: 13px; margin-top: 15px; font-weight: 600; text-align: left; background: #f8d7da; padding: 10px; border-radius: 4px; display: none; }
+
+        #master-document { max-width: 210mm; margin: 0 auto; background: transparent; }
+        .aluno-page { background: white; padding: 20mm 15mm; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 4px; }
+        .cabecalho { text-align: center; margin-bottom: 35px; border-bottom: 2px solid var(--azul-cp2); padding-bottom: 15px; }
+        .cabecalho h1 { color: var(--azul-cp2); margin: 0; font-size: 14pt; text-transform: uppercase; font-weight: 700; }
+        .cabecalho h2 { color: #475569; margin: 6px 0 0 0; font-size: 11pt; font-weight: 600; }
+        .grupo-titulo { margin-top: 20px; page-break-inside: avoid; break-inside: avoid; page-break-after: avoid; break-after: avoid; margin-bottom: 5px; }
+        .topico { color: var(--azul-cp2); font-size: 12pt; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--azul-cp2); margin-top: 30px; margin-bottom: 15px; padding-bottom: 4px; }
+        .grupo-titulo .topico { margin-top: 10px; }
+        .campo-bloco { display: flex; flex-direction: row; align-items: baseline; margin-bottom: 2px; line-height: 1.2; page-break-inside: avoid; break-inside: avoid; }
+        .campo-titulo { font-size: 9pt; color: #64748b; text-transform: uppercase; font-weight: 700; margin-right: 10px; margin-bottom: 0; white-space: nowrap; }
+        .campo-valor { font-size: 10.5pt; color: #0f172a; flex-grow: 1; padding: 0; min-height: auto; word-break: break-word; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 10pt; }
+        .pdf-table th, .pdf-table td { border: none; border-bottom: 1px solid var(--cinza-borda); padding: 10px 8px; text-align: left; vertical-align: top; }
+        .bg-titulo { background-color: transparent; color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 8.5pt; letter-spacing: 0.5px; }
+        thead { display: table-row-group; }
+        .nota-rodape { font-size: 9pt; font-style: italic; color: #94a3b8; margin-bottom: 15px; }
+        .assinaturas { margin-top: 50px; display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: space-between; gap: 15px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+        .linha-assinatura { border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600; font-size: 9.5pt; color: var(--azul-cp2); }
+        .cargo-assinatura { font-size: 8.5pt; color: #64748b; margin-top: 4px; }
+
+        @page { size: A4 portrait; margin: 15mm; }
+        @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .no-print { display: none !important; }
+            #master-document { max-width: 100%; margin: 0; }
+            .aluno-page { background: transparent; padding: 0; margin: 0; box-shadow: none; border-radius: 0; page-break-before: always; break-before: page; }
+            .aluno-page:first-child { page-break-before: avoid; break-before: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="painel-controlo no-print">
+        <h2 style="color: var(--azul-cp2); margin-top:0;">Gerador de PEI - Lote Único</h2>
+        <p>Texto 100% copiável. Correção de espaçamento ultra-compacto no cabeçalho.</p>
+        <input type="file" id="excel-files" accept=".xlsx, .xls" multiple>
+        
+        <div>
+            <button class="btn-acao" id="btn-processar" onclick="iniciarProcessamento()">⚙️ Processar Ficheiros (Navegador)</button>
+            <button class="btn-acao btn-imprimir" id="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar em PDF</button>
+        </div>
+        <button class="btn-acao btn-lote-electron" id="btn-lote-electron">🚀 Gerar Lote de PDFs (Modo Desktop)</button>
+        
+        <div id="status-lote"></div>
+        <div id="erro-log"></div>
+    </div>
+
+    <div id="master-document"></div>
+
+    <script>
+        let arquivosLote = [];
+
+        // --- FUNÇÃO UNIVERSAL DE PROCESSAMENTO (Funciona no Browser e no Electron) ---
+        async function processarDadosExcel(buffer, nomeArquivo) {
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(buffer);
+            
+            let html = '<div class="aluno-page">';
+            html += `<div class="cabecalho"><h1>PEI - PLANO EDUCACIONAL INDIVIDUALIZADO</h1><h2>Colégio Pedro II – Campus Realengo I</h2></div>`;
+
+            for (const worksheet of workbook.worksheets) {
+                let rows = [];
+                worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+                    let cells = [];
+                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                        let isSlave = false;
+                        try { if (cell.isMerged && cell.master && cell.master.address !== cell.address) isSlave = true; } catch(e) {}
+                        let argb = null;
+                        try { if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb) argb = String(cell.fill.fgColor.argb).toUpperCase(); } catch (e) {}
+                        let val = extrairTextoSeguro(cell).trim();
+                        cells[colNumber] = { val: val, color: argb, isSlave: isSlave };
+                    });
+                    rows[rowNumber] = cells;
+                });
+
+                let mappedRows = [];
+                for(let r = 1; r <= rows.length; r++) {
+                    let row = rows[r];
+                    if(!row) continue;
+                    let vCells = row.filter(c => c && !c.isSlave && (c.val !== '' || isYellow(c.color)));
+                    if(vCells.length === 0) continue;
+                    
+                    let type = 'LABEL';
+                    if (r === 1) type = 'IGNORE';
+                    else if (vCells.some(c => isDarkGreen(c.color))) type = 'IGNORE';
+                    else if (vCells.some(c => isTopicBlue(c.color))) type = 'TOPICO';
+                    else if (vCells.filter(c => isYellow(c.color)).length === 1) type = 'DATA_SINGLE';
+                    else if (vCells.filter(c => isYellow(c.color)).length > 1) type = 'DATA_MULTI';
+                    
+                    mappedRows.push({ r, row, vCells, type });
+                }
+
+                let currentTopico = null;
+                let currentLabels = [];
+                let tableOpen = false;
+
+                function closeTable() { if(tableOpen) { html += '</tbody></table>'; tableOpen = false; } }
+
+                for(let i = 0; i < mappedRows.length; i++) {
+                    let m = mappedRows[i];
+                    if (m.type === 'IGNORE') continue;
+                    
+                    if (m.type === 'TOPICO') {
+                        closeTable(); currentTopico = m; currentLabels = [];
+                    } else if (m.type === 'LABEL') {
+                        closeTable(); currentLabels.push(m);
+                    } else if (m.type === 'DATA_SINGLE') {
+                        closeTable();
+                        let yCell = m.vCells.find(c => isYellow(c.color));
+                        if (!yCell || yCell.val === '') { if (currentLabels.length > 0) currentLabels.pop(); continue; }
+                        
+                        let flushHtml = '<div class="grupo-titulo">';
+                        if (currentTopico) { flushHtml += `<div class="topico">${formatarTexto(currentTopico.vCells.find(c => isTopicBlue(c.color)).val)}</div>`; currentTopico = null; }
+                        let titleCells = m.vCells.filter(c => !isYellow(c.color));
+                        let title = titleCells.map(c => c.val).filter(v => v !== '').join(' - ');
+                        if (title === '' && currentLabels.length > 0) {
+                            let lastLabel = currentLabels.pop();
+                            title = lastLabel.vCells.map(c => c.val).filter(v => v !== '').join(' - ');
+                        }
+                        for (let lbl of currentLabels) { flushHtml += `<div class="nota-rodape">${formatarTexto(lbl.vCells.map(c=>c.val).filter(v=>v!=='').join(' - '))}</div>`; }
+                        flushHtml += '</div>';
+                        currentLabels = []; 
+                        html += flushHtml;
+                        html += `<div class="campo-bloco"><div class="campo-titulo">${formatarTexto(title)}:</div><div class="campo-valor">${formatarTexto(yCell.val)}</div></div>`;
+                    } else if (m.type === 'DATA_MULTI') {
+                        let yellows = m.vCells.filter(c => isYellow(c.color));
+                        let filled = yellows.filter(c => c.val !== '');
+                        if (filled.length === 0) continue;
+                        
+                        if (!tableOpen) {
+                            let flushHtml = '<div class="grupo-titulo">';
+                            if (currentTopico) { flushHtml += `<div class="topico">${formatarTexto(currentTopico.vCells.find(c => isTopicBlue(c.color)).val)}</div>`; currentTopico = null; }
+                            let tableHeaderHtml = `<thead><tr>`;
+                            if (currentLabels.length > 0) {
+                                let lastLabel = currentLabels.pop(); 
+                                lastLabel.row.forEach(c => { if(c && !c.isSlave && (c.val !== '' || isYellow(c.color))) tableHeaderHtml += `<th class="bg-titulo">${formatarTexto(c.val)}</th>`; });
+                            } else { tableHeaderHtml += `<th>...</th>`; }
+                            tableHeaderHtml += `</tr></thead>`;
+                            for (let lbl of currentLabels) { flushHtml += `<div class="nota-rodape">${formatarTexto(lbl.vCells.map(c=>c.val).filter(v=>v!=='').join(' - '))}</div>`; }
+                            flushHtml += '</div>';
+                            currentLabels = [];
+                            html += flushHtml + `<table class="pdf-table">` + tableHeaderHtml + `<tbody>`;
+                            tableOpen = true;
+                        }
+                        html += `<tr>`;
+                        m.row.forEach(c => { if(c && !c.isSlave && (c.val !== '' || isYellow(c.color))) html += `<td>${formatarTexto(c.val)}</td>`; });
+                        html += `</tr>`;
+                    }
+                }
+                closeTable();
+            }
+            html += `<div class="assinaturas">
+                <div style="flex:1;"><div class="linha-assinatura">Assinatura</div><div class="cargo-assinatura">SOEP</div></div>
+                <div style="flex:1;"><div class="linha-assinatura">Assinatura</div><div class="cargo-assinatura">NAPNE / AEE</div></div>
+                <div style="flex:1;"><div class="linha-assinatura">Assinatura</div><div class="cargo-assinatura">Coordenação Pedagógica</div></div>
+                <div style="flex:1;"><div class="linha-assinatura">Assinatura</div><div class="cargo-assinatura">Direção Pedagógica</div></div>
+            </div></div>`;
+            return html;
+        }
+
+        // --- FUNÇÕES AUXILIARES (Do seu código original) ---
+        function isYellow(c) { return c && (c.includes('FDE7') || c.includes('FFFF00')); }
+        function isDarkGreen(c) { return c && (c.includes('1A6B4A') || c.includes('8B5CF6')); }
+        function isTopicBlue(c) { return c && (c.includes('2D6A9F') || c.includes('C05C1A')); }
+        function extrairTextoSeguro(cell) {
+            if (!cell || cell.value === null || cell.value === undefined) return '';
+            try {
+                if (cell.value.richText) return cell.value.richText.map(t => t.text || '').join('');
+                if (cell.value.formula !== undefined || cell.value.sharedFormula !== undefined) return (cell.value.result !== null && cell.value.result !== undefined) ? String(cell.value.result) : '';
+                if (cell.value instanceof Date) return cell.value.toLocaleDateString('pt-BR');
+                return String(cell.value);
+            } catch (e) { return ''; }
+        }
+        function formatarTexto(valor) { if (!valor) return ''; return String(valor).trim().replace(/\n/g, '<br>'); }
+
+        // --- MODO NAVEGADOR (Original) ---
+        document.getElementById('excel-files').addEventListener('change', function(e) {
+            arquivosLote = Array.from(e.target.files);
+            const statusLabel = document.getElementById('status-lote');
+            if(arquivosLote.length > 0) {
+                statusLabel.innerText = `${arquivosLote.length} ficheiro(s) selecionado(s) e prontos.`;
+                document.getElementById('btn-imprimir').style.display = 'none';
+                document.getElementById('master-document').innerHTML = '';
+            }
+        });
+
+        async function iniciarProcessamento() {
+            if(arquivosLote.length === 0) return;
+            const btnProc = document.getElementById('btn-processar');
+            const btnImp = document.getElementById('btn-imprimir');
+            const statusLabel = document.getElementById('status-lote');
+            const erroLog = document.getElementById('erro-log');
+            const masterDoc = document.getElementById('master-document');
+            
+            btnProc.disabled = true; erroLog.style.display = 'none'; erroLog.innerHTML = ""; masterDoc.innerHTML = ""; btnImp.style.display = 'none';
+            let accumulatedHtml = '';
+
+            for (let i = 0; i < arquivosLote.length; i++) {
+                statusLabel.innerText = `⏳ A ler dados do aluno ${i + 1} de ${arquivosLote.length}...`;
+                try {
+                    const buffer = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => resolve(event.target.result);
+                        reader.onerror = reject;
+                        reader.readAsArrayBuffer(arquivosLote[i]);
+                    });
+                    let htmlAluno = await processarDadosExcel(buffer, arquivosLote[i].name);
+                    if (htmlAluno) accumulatedHtml += htmlAluno;
+                } catch (error) {
+                    erroLog.style.display = 'block';
+                    erroLog.innerHTML += `<strong>Falha com ${arquivosLote[i].name}:</strong> ${error.message}<br>`;
+                }
+            }
+            masterDoc.innerHTML = accumulatedHtml;
+            statusLabel.innerText = `✅ Relatório consolidado! O Documento Mestre está pronto.`;
+            statusLabel.style.color = "#28a745";
+            btnProc.disabled = false; btnProc.innerText = "🔄 Selecionar Novos";
+            btnImp.style.display = 'inline-block';
+        }
+
+                // --- MODO ELECTRON (Desktop) ---
+        const isElectron = navigator.userAgent.toLowerCase().indexOf(' electron/') > -1;
+        if (isElectron) {
+            document.getElementById('btn-lote-electron').style.display = 'block';
+            document.getElementById('excel-files').style.display = 'none';
+            document.getElementById('btn-processar').style.display = 'none';
+
+            const { ipcRenderer } = require('electron');
+            const path = require('path');
+            const fs = require('fs');
+
+            document.getElementById('btn-lote-electron').addEventListener('click', async function() {
+                const btn = this;
+                const statusLabel = document.getElementById('status-lote');
+                const textoOriginal = btn.innerText;
+                
+                btn.innerText = '⏳ Passo 1/2: Selecione os ficheiros Excel...';
+                btn.disabled = true;
+                statusLabel.innerText = 'Aguardando seleção dos ficheiros...';
+
+                try {
+                    // 1. Selecionar ficheiros
+                    const { filePaths } = await ipcRenderer.invoke('abrir-excel');
+                    if (!filePaths || filePaths.length === 0) { 
+                        btn.innerText = textoOriginal; 
+                        btn.disabled = false; 
+                        statusLabel.innerText = 'Processo cancelado.';
+                        return; 
+                    }
+
+                    // 2. MENSAGEM CLARA PARA O UTILIZADOR
+                    statusLabel.innerText = `✅ ${filePaths.length} ficheiro(s) selecionado(s)!`;
+                    alert('Agora, selecione a PASTA DE DESTINO onde os PDFs serão salvos.');
+                    
+                    statusLabel.innerText = '📂 Passo 2/2: Aguardando seleção da pasta de destino...';
+                    
+                    // 3. Selecionar pasta
+                    const { filePaths: [pastaDestino] } = await ipcRenderer.invoke('selecionar-pasta');
+                    if (!pastaDestino) { 
+                        btn.innerText = textoOriginal; 
+                        btn.disabled = false; 
+                        statusLabel.innerText = 'Processo cancelado.';
+                        return; 
+                    }
+
+                    const headHTML = document.head.innerHTML;
+                    let sucessoCount = 0, erroCount = 0;
+
+                    // 4. Processar cada ficheiro
+                    for (let i = 0; i < filePaths.length; i++) {
+                        const arquivo = filePaths[i];
+                        btn.innerText = `⏳ Processando ${i + 1} de ${filePaths.length}...`;
+                        statusLabel.innerText = `A gerar PDF para: ${path.basename(arquivo)}...`;
+                        
+                        try {
+                            const buffer = fs.readFileSync(arquivo);
+                            const htmlAluno = await processarDadosExcel(buffer, path.basename(arquivo));
+                            const htmlCompleto = `<!DOCTYPE html><html lang="pt-PT"><head>${headHTML}</head><body>${htmlAluno}</body></html>`;
+                            
+                            const nomePDF = `PEI_${path.basename(arquivo, path.extname(arquivo))}`.replace(/[^a-zA-Z0-9À-ÿ\s]/g, '_');
+
+                            const resultado = await ipcRenderer.invoke('gerar-pdf-silencioso', {
+                                htmlContent: htmlCompleto,
+                                nomeFicheiro: nomePDF,
+                                pastaDestino: pastaDestino
+                            });
+
+                            if (resultado.sucesso) sucessoCount++;
+                            else erroCount++;
+                        } catch (erro) {
+                            erroCount++;
+                            console.error(`Erro ao processar ${arquivo}:`, erro);
+                        }
+                    }
+
+                    alert(`✅ Processo concluído com sucesso!\n\n📄 PDFs gerados: ${sucessoCount}\n❌ Erros: ${erroCount}\n\n📁 Local de salvamento:\n${pastaDestino}`);
+                    statusLabel.innerText = `✅ Conclusão: ${sucessoCount} PDFs gerados com sucesso.`;
+                } catch (erro) {
+                    alert("Ocorreu um erro inesperado: " + erro.message);
+                    statusLabel.innerText = '❌ Erro no processo.';
+                } finally {
+                    btn.innerText = textoOriginal;
+                    btn.disabled = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

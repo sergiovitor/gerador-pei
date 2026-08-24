@@ -19,8 +19,7 @@
     "appId": "com.geradorpei.desktop",
     "productName": "Gerador de PEI",
     "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
+      "target": "nsis"
     },
     "linux": {
       "target": "deb",

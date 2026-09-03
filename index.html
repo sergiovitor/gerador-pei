@@ -298,7 +298,7 @@
                             const htmlAluno = await processarDadosExcel(buffer, path.basename(arquivo));
                             const htmlCompleto = `<!DOCTYPE html><html lang="pt-PT"><head>${headHTML}</head><body>${htmlAluno}</body></html>`;
                             
-                            const nomePDF = `PEI_${path.basename(arquivo, path.extname(arquivo))}`.replace(/[^a-zA-Z0-9À-ÿ\s]/g, '_');
+                            const nomePDF = `${path.basename(arquivo, path.extname(arquivo))}`.replace(/[^a-zA-Z0-9À-ÿ\s]/g, '_');
 
                             const resultado = await ipcRenderer.invoke('gerar-pdf-silencioso', {
                                 htmlContent: htmlCompleto,
